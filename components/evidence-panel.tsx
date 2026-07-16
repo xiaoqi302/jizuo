@@ -1,7 +1,7 @@
 "use client";
 
 import type { SessionEvent, StoryCard, StoryNode, StoryProject } from "@/lib/schema";
-import { Check, Link2, ShieldCheck, Trash2 } from "lucide-react";
+import { Check, Link2, ShieldCheck, Trash2, X } from "lucide-react";
 
 type EvidencePanelProps = {
   card: StoryCard;
@@ -11,6 +11,7 @@ type EvidencePanelProps = {
   notice: string;
   onUpdate: (changes: Partial<Pick<StoryCard, "eyebrow" | "title" | "body">>) => void;
   onRemoveEvidence: (eventId: string) => void;
+  onRemoveNode: (nodeId: string) => void;
 };
 
 export function EvidencePanel({
@@ -21,6 +22,7 @@ export function EvidencePanel({
   notice,
   onUpdate,
   onRemoveEvidence,
+  onRemoveNode,
 }: EvidencePanelProps) {
   const linkedEvents = card.evidenceIds
     .map((id) => events.find((event) => event.id === id))
@@ -93,7 +95,10 @@ export function EvidencePanel({
       <div className="evidence-section linked-node-section">
         <div className="section-title"><span><GitBranchMark /> 内容节点</span></div>
         {linkedNodes.map((node) => (
-          <span className="linked-node" key={node.id}><Check size={12} />{node.title}</span>
+          <span className="linked-node" key={node.id}>
+            <Check size={12} />{node.title}
+            <button type="button" title="从当前页移除节点" onClick={() => onRemoveNode(node.id)}><X size={11} /></button>
+          </span>
         ))}
       </div>
 

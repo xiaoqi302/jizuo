@@ -1,11 +1,11 @@
-import type { SessionEvent } from "@/lib/schema";
+import { eventKindSchema, sessionEventSchema, type SessionEvent } from "@/lib/schema";
 import { redactText } from "@/lib/redact";
 
 type JsonRecord = Record<string, unknown>;
 
 export type ParseResult = {
   events: SessionEvent[];
-  format: "codex-jsonl" | "plain-text";
+  format: "codex-jsonl" | "json" | "plain-text";
   redactionCount: number;
   skippedLines: number;
 };
@@ -184,6 +184,73 @@ function parsePlainText(text: string) {
   return { events, redactionCount, skippedLines: 0 };
 }
 
+function parseJsonDocument(value: unknown) {
+  const root = asRecord(value);
+  const items = Array.isArray(value)
+    ? value
+    : Array.isArray(root?.messages)
+      ? root.messages
+      : Array.isArray(root?.events)
+        ? root.events
+        : root?.type
+          ? [root]
+          : [];
+  if (!items.length) return null;
+
+  if (items.every((item) => typeof asRecord(item)?.type === "string")) {
+    return parseJsonl(items.map((item) => JSON.stringify(item)).join("\n"));
+  }
+
+  const events: SessionEvent[] = [];
+  let redactionCount = 0;
+  let skippedLines = 0;
+  for (const item of items) {
+    const record = asRecord(item);
+    if (!record) {
+      skippedLines += 1;
+      continue;
+    }
+
+    const existing = sessionEventSchema.safeParse(record);
+    if (existing.success) {
+      const redacted = redactText(cleanText(existing.data.text));
+      redactionCount += redacted.count;
+      events.push({ ...existing.data, id: `event-${events.length + 1}`, index: events.length, text: redacted.text });
+      continue;
+    }
+
+    const role = (stringValue(record.role) || stringValue(record.actor)).toLowerCase();
+    const rawText = contentText(record.content) || stringValue(record.text) || stringValue(record.message);
+    if (!rawText.trim()) {
+      skippedLines += 1;
+      continue;
+    }
+    const actor: SessionEvent["actor"] = /assistant|agent/.test(role) ? "agent" : role === "tool" ? "tool" : "user";
+    const suppliedKind = eventKindSchema.safeParse(record.kind);
+    const kind: SessionEvent["kind"] = suppliedKind.success
+      ? suppliedKind.data
+      : actor === "user"
+        ? "prompt"
+        : actor === "tool"
+          ? looksLikeError(rawText) ? "error" : "tool_result"
+          : "message";
+    const redacted = redactText(cleanText(rawText));
+    redactionCount += redacted.count;
+    events.push({
+      id: `event-${events.length + 1}`,
+      index: events.length,
+      timestamp: stringValue(record.timestamp) || null,
+      kind,
+      actor,
+      title: eventTitle(redacted.text, actor === "user" ? "用户输入" : actor === "agent" ? "Agent 回应" : "工具结果"),
+      text: redacted.text,
+      evidenceLabel: stringValue(record.evidenceLabel) || (actor === "user" ? "原始需求" : actor === "agent" ? "Agent 输出" : "工具结果"),
+      toolName: stringValue(record.toolName) || undefined,
+    });
+  }
+  return { events, redactionCount, skippedLines };
+}
+
 function compactEvents(events: SessionEvent[]) {
   if (events.length <= MAX_EVENTS) return events;
   const important = events.filter(
@@ -199,6 +266,13 @@ function compactEvents(events: SessionEvent[]) {
 export function parseSessionText(text: string): ParseResult {
   const trimmed = text.trim();
   if (!trimmed) throw new Error("\u6587\u4ef6\u5185\u5bb9\u4e3a\u7a7a");
+  let jsonDocument: ReturnType<typeof parseJsonDocument> = null;
+  try {
+    jsonDocument = parseJsonDocument(JSON.parse(trimmed));
+  } catch {
+    jsonDocument = null;
+  }
+
   const firstLine = trimmed.split(/\r?\n/, 1)[0];
   let jsonl = false;
   try {
@@ -208,12 +282,12 @@ export function parseSessionText(text: string): ParseResult {
     jsonl = false;
   }
 
-  const parsed = jsonl ? parseJsonl(trimmed) : parsePlainText(trimmed);
+  const parsed = jsonDocument || (jsonl ? parseJsonl(trimmed) : parsePlainText(trimmed));
   const events = compactEvents(parsed.events);
   if (events.length < 2) throw new Error("\u6ca1\u6709\u627e\u5230\u8db3\u591f\u7684\u5bf9\u8bdd\u6216\u5de5\u5177\u4e8b\u4ef6");
   return {
     ...parsed,
     events,
-    format: jsonl ? "codex-jsonl" : "plain-text",
+    format: jsonDocument ? (jsonl ? "codex-jsonl" : "json") : jsonl ? "codex-jsonl" : "plain-text",
   };
 }

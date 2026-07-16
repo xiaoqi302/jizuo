@@ -34,10 +34,6 @@ function allowed(ip: string) {
 }
 
 export async function POST(request: Request) {
-  if (!allowed(clientIp(request))) {
-    return NextResponse.json({ error: "请求过于频繁，请 10 分钟后再试。" }, { status: 429 });
-  }
-
   const raw = await request.text();
   if (raw.length > MAX_BODY_LENGTH) {
     return NextResponse.json({ error: "会话内容过大，请精简后重试。" }, { status: 413 });
@@ -60,6 +56,10 @@ export async function POST(request: Request) {
       mode: "sample",
       notice: "已加载内置示例；上传你的日志即可调用 DeepSeek 分析。",
     });
+  }
+
+  if (!allowed(clientIp(request))) {
+    return NextResponse.json({ error: "请求过于频繁，请 10 分钟后再试。" }, { status: 429 });
   }
 
   const local = buildLocalStory(parsed.data.events, parsed.data.sourceName);

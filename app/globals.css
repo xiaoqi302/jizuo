@@ -1052,6 +1052,8 @@ button:disabled {
 .linked-node-section .section-title { width: 100%; }
 .branch-mark { font-size: 15px; }
 .linked-node { display: inline-flex; gap: 4px; align-items: center; padding: 5px 7px; border: 1px solid var(--ink); background: var(--paper); font-family: var(--font-mono); font-size: 7px; }
+.linked-node button { display: grid; margin-left: 2px; padding: 1px; place-items: center; background: transparent; color: var(--muted); }
+.linked-node button:hover { color: var(--orange); }
 
 .quality-warning { margin: 14px; padding: 10px; border-left: 4px solid var(--orange); background: #ffe2d9; }
 .quality-warning strong { font-size: 9px; }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildLocalStory, buildSampleStory } from "@/lib/local-story";
-import type { SessionEvent } from "@/lib/schema";
+import { storyProjectSchema, type SessionEvent } from "@/lib/schema";
 
 const events: SessionEvent[] = [
   { id: "e1", index: 0, timestamp: null, kind: "prompt", actor: "user", title: "\u505a一个创意工具", text: "\u6211想做一个不是 Prompt \u5957壳的工具。", evidenceLabel: "\u539f\u59cb\u9700\u6c42" },
@@ -25,5 +25,14 @@ describe("buildLocalStory", () => {
     expect(sample.cards).toHaveLength(8);
     expect(sample.quality.score).toBeGreaterThan(90);
     expect(sample.cards.every((card) => card.evidenceIds.length > 0)).toBe(true);
+  });
+
+  it("rejects empty evidence and an invalid eight-card role sequence", () => {
+    const sample = buildSampleStory(events, "jizuo-demo-session.jsonl");
+    const invalid = {
+      ...sample,
+      cards: sample.cards.map((card, index) => index === 0 ? { ...card, role: "context", evidenceIds: [] } : card),
+    };
+    expect(storyProjectSchema.safeParse(invalid).success).toBe(false);
   });
 });

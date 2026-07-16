@@ -199,6 +199,17 @@ export function JizuoStudio() {
     });
   }
 
+  function removeNode(nodeId: string) {
+    if (!project || !selectedCard) return;
+    setProject({
+      ...project,
+      cards: project.cards.map((card) =>
+        card.id === selectedCard.id ? { ...card, nodeIds: card.nodeIds.filter((id) => id !== nodeId) } : card,
+      ),
+    });
+    setNotice("已从当前页移除节点；已绑定的原始证据仍保留。");
+  }
+
   async function renderCard(element: HTMLElement) {
     await document.fonts.ready;
     return toPng(element, {
@@ -306,6 +317,7 @@ export function JizuoStudio() {
             notice={notice}
             onUpdate={updateCurrentCard}
             onRemoveEvidence={removeEvidence}
+            onRemoveNode={removeNode}
           />
         </div>
 
@@ -403,7 +415,7 @@ export function JizuoStudio() {
             <div className="receipt-metrics">
               <span><b>{parseResult.events.length}</b>事件</span>
               <span><b>{parseResult.redactionCount}</b>处脱敏</span>
-              <span><b>{parseResult.format === "codex-jsonl" ? "CODEX" : "TEXT"}</b>格式</span>
+              <span><b>{parseResult.format === "codex-jsonl" ? "CODEX" : parseResult.format === "json" ? "JSON" : "TEXT"}</b>格式</span>
             </div>
             <button className="primary-button analyze-button" type="button" disabled={busy} onClick={() => analyze()}>
               {busy ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}

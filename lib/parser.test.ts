@@ -31,6 +31,19 @@ describe("parseSessionText", () => {
     expect(result.events.map((event) => event.text).join(" ")).not.toContain("me@example.com");
   });
 
+  it("parses standard JSON message collections", () => {
+    const result = parseSessionText(JSON.stringify({
+      messages: [
+        { role: "user", content: "帮我把实操变成内容" },
+        { role: "assistant", content: "我会先找出失败和转折。" },
+      ],
+    }));
+
+    expect(result.format).toBe("json");
+    expect(result.events).toHaveLength(2);
+    expect(result.events.map((event) => event.actor)).toEqual(["user", "agent"]);
+  });
+
   it("rejects content without enough events", () => {
     expect(() => parseSessionText("\u53ea有一段文字")).toThrow("\u6ca1\u6709\u627e\u5230\u8db3\u591f");
   });

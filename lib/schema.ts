@@ -43,7 +43,7 @@ export const storyNodeSchema = z.object({
   emphasis: z.number().int().min(1).max(3),
 });
 
-export const cardRoleSchema = z.enum([
+export const cardRoleSequence = [
   "cover",
   "context",
   "problem",
@@ -52,7 +52,9 @@ export const cardRoleSchema = z.enum([
   "result",
   "lesson",
   "cta",
-]);
+] as const;
+
+export const cardRoleSchema = z.enum(cardRoleSequence);
 
 export const cardAccentSchema = z.enum(["orange", "blue", "yellow", "ink"]);
 
@@ -64,8 +66,19 @@ export const storyCardSchema = z.object({
   title: z.string().min(1).max(72),
   body: z.string().min(1).max(360),
   nodeIds: z.array(z.string()).max(6),
-  evidenceIds: z.array(z.string()).max(8),
+  evidenceIds: z.array(z.string()).min(1).max(8),
   accent: cardAccentSchema,
+});
+
+export const storyCardsSchema = z.array(storyCardSchema).length(8).superRefine((cards, context) => {
+  cards.forEach((card, index) => {
+    if (card.order !== index + 1) {
+      context.addIssue({ code: "custom", path: [index, "order"], message: `第 ${index + 1} 张卡片的 order 必须为 ${index + 1}` });
+    }
+    if (card.role !== cardRoleSequence[index]) {
+      context.addIssue({ code: "custom", path: [index, "role"], message: `第 ${index + 1} 张卡片的 role 必须为 ${cardRoleSequence[index]}` });
+    }
+  });
 });
 
 export const storyProjectSchema = z.object({
@@ -78,7 +91,7 @@ export const storyProjectSchema = z.object({
   createdAt: z.string(),
   source: z.enum(["deepseek", "local", "sample"]),
   nodes: z.array(storyNodeSchema).min(4).max(12),
-  cards: z.array(storyCardSchema).length(8),
+  cards: storyCardsSchema,
   quality: z.object({
     score: z.number().int().min(0).max(100),
     warnings: z.array(z.string().max(180)).max(8),
