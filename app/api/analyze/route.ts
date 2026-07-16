@@ -7,33 +7,47 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const WINDOW_MS = 10 * 60 * 1_000;
-const MAX_REQUESTS = 6;
+const MAX_INBOUND_REQUESTS = 60;
+const MAX_MODEL_REQUESTS = 6;
 const MAX_BODY_LENGTH = 360_000;
 
 type Bucket = { count: number; resetAt: number };
 const globalForRateLimit = globalThis as typeof globalThis & {
-  jizuoRateLimits?: Map<string, Bucket>;
+  jizuoInboundRateLimits?: Map<string, Bucket>;
+  jizuoModelRateLimits?: Map<string, Bucket>;
 };
-const rateLimits = globalForRateLimit.jizuoRateLimits || new Map<string, Bucket>();
-globalForRateLimit.jizuoRateLimits = rateLimits;
+const inboundRateLimits = globalForRateLimit.jizuoInboundRateLimits || new Map<string, Bucket>();
+const modelRateLimits = globalForRateLimit.jizuoModelRateLimits || new Map<string, Bucket>();
+globalForRateLimit.jizuoInboundRateLimits = inboundRateLimits;
+globalForRateLimit.jizuoModelRateLimits = modelRateLimits;
 
 function clientIp(request: Request) {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
 }
 
-function allowed(ip: string) {
+function allowed(buckets: Map<string, Bucket>, ip: string, limit: number) {
   const now = Date.now();
-  const current = rateLimits.get(ip);
+  const current = buckets.get(ip);
   if (!current || current.resetAt <= now) {
-    rateLimits.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    buckets.set(ip, { count: 1, resetAt: now + WINDOW_MS });
     return true;
   }
-  if (current.count >= MAX_REQUESTS) return false;
+  if (current.count >= limit) return false;
   current.count += 1;
   return true;
 }
 
 export async function POST(request: Request) {
+  const ip = clientIp(request);
+  if (!allowed(inboundRateLimits, ip, MAX_INBOUND_REQUESTS)) {
+    return NextResponse.json({ error: "请求过于频繁，请稍后再试。" }, { status: 429 });
+  }
+
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_LENGTH) {
+    return NextResponse.json({ error: "会话内容过大，请精简后重试。" }, { status: 413 });
+  }
+
   const raw = await request.text();
   if (raw.length > MAX_BODY_LENGTH) {
     return NextResponse.json({ error: "会话内容过大，请精简后重试。" }, { status: 413 });
@@ -58,7 +72,7 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!allowed(clientIp(request))) {
+  if (!allowed(modelRateLimits, ip, MAX_MODEL_REQUESTS)) {
     return NextResponse.json({ error: "请求过于频繁，请 10 分钟后再试。" }, { status: 429 });
   }
 

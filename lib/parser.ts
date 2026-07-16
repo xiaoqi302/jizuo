@@ -13,6 +13,8 @@ export type ParseResult = {
 const MAX_EVENT_TEXT = 2_200;
 const MAX_EVENTS = 120;
 
+type EventInput = Omit<SessionEvent, "id" | "index">;
+
 function asRecord(value: unknown): JsonRecord | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as JsonRecord)
@@ -60,6 +62,34 @@ function cleanText(value: string) {
   return value.replace(/\u0000/g, "").replace(/\n{3,}/g, "\n\n").trim().slice(0, MAX_EVENT_TEXT);
 }
 
+function redactEvent(event: EventInput) {
+  let count = 0;
+  const redactField = (value: string, maxLength: number) => {
+    const compact = value
+      .replace(/\u0000/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+      .slice(0, maxLength * 2);
+    const redacted = redactText(compact);
+    count += redacted.count;
+    return redacted.text.slice(0, maxLength);
+  };
+  const text = redactField(event.text, MAX_EVENT_TEXT);
+  if (!text) return { event: null, count };
+
+  return {
+    event: {
+      ...event,
+      timestamp: event.timestamp ? redactField(event.timestamp, 80) || null : null,
+      title: redactField(event.title, 140) || "事件记录",
+      text,
+      evidenceLabel: redactField(event.evidenceLabel, 120) || "事件证据",
+      toolName: event.toolName ? redactField(event.toolName, 80) || undefined : undefined,
+    },
+    count,
+  };
+}
+
 function eventTitle(text: string, fallback: string) {
   const firstLine = text.split("\n").find((line) => line.trim())?.trim() || fallback;
   return firstLine.replace(/^#+\s*/, "").slice(0, 120);
@@ -81,13 +111,12 @@ function parseJsonl(text: string) {
   let redactionCount = 0;
   let skippedLines = 0;
 
-  const pushEvent = (event: Omit<SessionEvent, "id" | "index">) => {
-    if (!event.text.trim()) return;
-    const redacted = redactText(cleanText(event.text));
+  const pushEvent = (event: EventInput) => {
+    const redacted = redactEvent(event);
     redactionCount += redacted.count;
-    if (!redacted.text) return;
+    if (!redacted.event) return;
     const index = events.length;
-    events.push({ ...event, id: `event-${index + 1}`, index, text: redacted.text });
+    events.push({ ...redacted.event, id: `event-${index + 1}`, index });
   };
 
   for (const line of text.split(/\r?\n/)) {
@@ -204,6 +233,14 @@ function parseJsonDocument(value: unknown) {
   const events: SessionEvent[] = [];
   let redactionCount = 0;
   let skippedLines = 0;
+  const pushEvent = (event: EventInput) => {
+    const redacted = redactEvent(event);
+    redactionCount += redacted.count;
+    if (!redacted.event) return;
+    const index = events.length;
+    events.push({ ...redacted.event, id: `event-${index + 1}`, index });
+  };
+
   for (const item of items) {
     const record = asRecord(item);
     if (!record) {
@@ -211,15 +248,23 @@ function parseJsonDocument(value: unknown) {
       continue;
     }
 
+    const role = (stringValue(record.role) || stringValue(record.actor)).toLowerCase();
+    if (role === "system" || role === "developer") continue;
+
     const existing = sessionEventSchema.safeParse(record);
     if (existing.success) {
-      const redacted = redactText(cleanText(existing.data.text));
-      redactionCount += redacted.count;
-      events.push({ ...existing.data, id: `event-${events.length + 1}`, index: events.length, text: redacted.text });
+      pushEvent({
+        timestamp: existing.data.timestamp,
+        kind: existing.data.kind,
+        actor: existing.data.actor,
+        title: existing.data.title,
+        text: existing.data.text,
+        evidenceLabel: existing.data.evidenceLabel,
+        toolName: existing.data.toolName,
+      });
       continue;
     }
 
-    const role = (stringValue(record.role) || stringValue(record.actor)).toLowerCase();
     const rawText = contentText(record.content) || stringValue(record.text) || stringValue(record.message);
     if (!rawText.trim()) {
       skippedLines += 1;
@@ -234,16 +279,12 @@ function parseJsonDocument(value: unknown) {
         : actor === "tool"
           ? looksLikeError(rawText) ? "error" : "tool_result"
           : "message";
-    const redacted = redactText(cleanText(rawText));
-    redactionCount += redacted.count;
-    events.push({
-      id: `event-${events.length + 1}`,
-      index: events.length,
+    pushEvent({
       timestamp: stringValue(record.timestamp) || null,
       kind,
       actor,
-      title: eventTitle(redacted.text, actor === "user" ? "用户输入" : actor === "agent" ? "Agent 回应" : "工具结果"),
-      text: redacted.text,
+      title: eventTitle(rawText, actor === "user" ? "用户输入" : actor === "agent" ? "Agent 回应" : "工具结果"),
+      text: rawText,
       evidenceLabel: stringValue(record.evidenceLabel) || (actor === "user" ? "原始需求" : actor === "agent" ? "Agent 输出" : "工具结果"),
       toolName: stringValue(record.toolName) || undefined,
     });

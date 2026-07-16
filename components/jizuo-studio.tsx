@@ -4,6 +4,7 @@ import { EvidencePanel } from "@/components/evidence-panel";
 import { StoryCardView } from "@/components/story-card";
 import { TraceMap } from "@/components/trace-map";
 import { parseSessionText, type ParseResult } from "@/lib/parser";
+import { redactText } from "@/lib/redact";
 import { storyProjectSchema, type SessionEvent, type StoryCard, type StoryProject } from "@/lib/schema";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
@@ -23,7 +24,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
-const STORAGE_KEY = "jizuo:last-project:v1";
+const STORAGE_KEY = "jizuo:last-project:v2";
+const LEGACY_STORAGE_KEY = "jizuo:last-project:v1";
 
 type StoredWorkspace = {
   project: StoryProject;
@@ -49,6 +51,7 @@ export function JizuoStudio() {
   useEffect(() => {
     let restoreFrame: number | undefined;
     try {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return;
       const workspace = JSON.parse(saved) as StoredWorkspace;
@@ -83,10 +86,12 @@ export function JizuoStudio() {
   const selectedCard = project?.cards.find((card) => card.id === selectedCardId) || project?.cards[0] || null;
 
   function ingestText(text: string, name: string) {
-    const result = parseSessionText(text);
+    const parsed = parseSessionText(text);
+    const safeName = redactText(name);
+    const result = { ...parsed, redactionCount: parsed.redactionCount + safeName.count };
     setEvents(result.events);
     setParseResult(result);
-    setSourceName(name);
+    setSourceName(safeName.text.slice(0, 160) || "imported-session");
     setProject(null);
     setSelectedCardId("card-1");
     setSelectedNodeId(null);
@@ -157,6 +162,7 @@ export function JizuoStudio() {
     setNotice("");
     setError("");
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   }
 
   function updateCurrentCard(changes: Partial<Pick<StoryCard, "eyebrow" | "title" | "body">>) {

@@ -44,6 +44,55 @@ describe("parseSessionText", () => {
     expect(result.events.map((event) => event.actor)).toEqual(["user", "agent"]);
   });
 
+  it("skips system instructions in standard JSON", () => {
+    const result = parseSessionText(JSON.stringify({
+      messages: [
+        { role: "system", content: "private system prompt" },
+        { role: "developer", content: "private developer prompt" },
+        { role: "user", content: "公开任务" },
+        { role: "assistant", content: "公开回答" },
+      ],
+    }));
+
+    expect(result.events).toHaveLength(2);
+    expect(JSON.stringify(result.events)).not.toContain("private");
+  });
+
+  it("redacts every persisted string field in JSON events", () => {
+    const result = parseSessionText(JSON.stringify({
+      events: [
+        {
+          id: "raw-1",
+          index: 0,
+          timestamp: "Authorization: Bearer timestamp-secret",
+          kind: "tool_call",
+          actor: "tool",
+          title: "me@example.com",
+          text: "执行安全检查",
+          evidenceLabel: "TOKEN=label-secret",
+          toolName: "sk-1234567890abcdefghij",
+        },
+        {
+          id: "raw-2",
+          index: 1,
+          timestamp: null,
+          kind: "message",
+          actor: "agent",
+          title: "完成",
+          text: "检查完成",
+          evidenceLabel: "Agent 输出",
+        },
+      ],
+    }));
+
+    const serialized = JSON.stringify(result.events);
+    expect(result.redactionCount).toBeGreaterThanOrEqual(4);
+    expect(serialized).not.toContain("timestamp-secret");
+    expect(serialized).not.toContain("me@example.com");
+    expect(serialized).not.toContain("label-secret");
+    expect(serialized).not.toContain("sk-1234567890abcdefghij");
+  });
+
   it("rejects content without enough events", () => {
     expect(() => parseSessionText("\u53ea有一段文字")).toThrow("\u6ca1\u6709\u627e\u5230\u8db3\u591f");
   });
