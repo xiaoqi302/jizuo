@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       project: buildSampleStory(parsed.data.events, parsed.data.sourceName),
       mode: "sample",
-      notice: "已加载内置示例；上传你的日志即可调用 DeepSeek 分析。",
+      notice: "已加载内置示例；上传日志将优先调用 DeepSeek，不可用时会透明降级。",
     });
   }
 
