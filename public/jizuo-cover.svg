@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <pattern id="grid" width="46" height="46" patternUnits="userSpaceOnUse">
+      <path d="M46 0H0V46" fill="none" stroke="#101116" stroke-opacity=".07" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="#f3ead8"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <path d="M0 0h1200v18H0z" fill="#ff5733"/>
+  <circle cx="1050" cy="340" r="252" fill="none" stroke="#101116" stroke-width="44"/>
+  <circle cx="1050" cy="340" r="252" fill="none" stroke="#ff7354" stroke-width="34"/>
+  <text x="74" y="88" font-family="Arial, sans-serif" font-size="25" font-weight="700" letter-spacing="3" fill="#101116">JIZUO°</text>
+  <rect x="74" y="126" width="278" height="38" fill="#101116"/>
+  <text x="92" y="152" font-family="monospace" font-size="16" font-weight="700" letter-spacing="2" fill="#f3ead8">AGENT TRACE → STORY</text>
+  <text x="72" y="292" font-family="Arial Black, Arial, sans-serif" font-size="83" font-weight="900" letter-spacing="-4" fill="#101116">TURN AI TRACES</text>
+  <text x="72" y="386" font-family="Arial Black, Arial, sans-serif" font-size="83" font-weight="900" letter-spacing="-4" fill="#101116">INTO <tspan fill="#ff5733">STORIES.</tspan></text>
+  <path d="M74 438h725" stroke="#101116" stroke-width="3"/>
+  <text x="74" y="484" font-family="monospace" font-size="17" letter-spacing="1.5" fill="#101116">DECISION TRACE  /  EVIDENCE LINK  /  8-CARD STORYBOARD</text>
+  <circle cx="84" cy="550" r="10" fill="#27ad78"/>
+  <text x="108" y="557" font-family="monospace" font-size="18" letter-spacing="2" fill="#101116">IMPORT A SESSION. TELL ITS STORY.</text>
+</svg>

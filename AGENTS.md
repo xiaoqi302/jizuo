@@ -1,5 +1,8 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# AGENTS.md
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+- 如无必要，勿增实体。
+- 默认使用中文回复，言简意赅，按需使用 Emoji。
+- 项目使用 Next.js、React、TypeScript 和 Tailwind CSS，不随意更换技术栈。
+- 涉及会话日志时，必须先在客户端脱敏，禁止持久化用户原始日志。
+- 若提交 Git，提交 Log 需包含问题描述、复现路径或修复思路。
+- 开发期间定期运行单测和类型检查，交付前运行完整测试、Lint 和构建。
