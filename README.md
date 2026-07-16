@@ -53,11 +53,13 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Add your DeepSeek key to `.env.local`:
+Jizuo supports two server-side routes: a direct DeepSeek key, or Vercel's OIDC identity through AI Gateway after AI credits are enabled for the account. For local direct access, add a DeepSeek key to `.env.local`:
 
 ```bash
 DEEPSEEK_API_KEY=your_key_here
 ```
+
+For local AI Gateway access, set `AI_GATEWAY_API_KEY` instead.
 
 Then open `http://localhost:3000`. You can also click **Try the sample trace** without a key.
 

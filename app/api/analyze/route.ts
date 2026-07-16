@@ -78,7 +78,10 @@ export async function POST(request: Request) {
 
   const local = buildLocalStory(parsed.data.events, parsed.data.sourceName);
   try {
-    const draft = await generateStoryWithDeepSeek(parsed.data.events);
+    const draft = await generateStoryWithDeepSeek(
+      parsed.data.events,
+      request.headers.get("x-vercel-oidc-token"),
+    );
     if (!draft) {
       return NextResponse.json({
         project: local,

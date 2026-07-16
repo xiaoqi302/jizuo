@@ -5,6 +5,8 @@ import { storyDraftSchema } from "@/lib/schema";
 
 const DEFAULT_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_MODEL = "deepseek-v4-flash";
+const GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh/v1";
+const GATEWAY_MODEL = "deepseek/deepseek-v4-flash";
 const TIMEOUT_MS = 45_000;
 
 type DeepSeekMessage = {
@@ -61,33 +63,55 @@ JSON 结构：
 }
 `.trim();
 
-function hasDeepSeekConfig() {
-  return Boolean(process.env.DEEPSEEK_API_KEY);
+function modelConfig(oidcToken?: string | null) {
+  const directKey = process.env.DEEPSEEK_API_KEY?.trim();
+  if (directKey) {
+    return {
+      apiKey: directKey,
+      baseUrl: process.env.DEEPSEEK_BASE_URL || DEFAULT_BASE_URL,
+      model: process.env.DEEPSEEK_MODEL || DEFAULT_MODEL,
+      direct: true,
+    };
+  }
+
+  const gatewayKey = process.env.AI_GATEWAY_API_KEY?.trim()
+    || oidcToken?.trim()
+    || process.env.VERCEL_OIDC_TOKEN?.trim();
+  if (gatewayKey) {
+    return {
+      apiKey: gatewayKey,
+      baseUrl: GATEWAY_BASE_URL,
+      model: process.env.AI_GATEWAY_MODEL || GATEWAY_MODEL,
+      direct: false,
+    };
+  }
+
+  return null;
 }
 
-function endpoint() {
-  return `${(process.env.DEEPSEEK_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "")}/chat/completions`;
-}
+async function requestJson(messages: DeepSeekMessage[], oidcToken?: string | null) {
+  const config = modelConfig(oidcToken);
+  if (!config) throw new Error("DeepSeek credentials are missing");
 
-async function requestJson(messages: DeepSeekMessage[]) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) throw new Error("DEEPSEEK_API_KEY is missing");
+  const body: Record<string, unknown> = {
+    model: config.model,
+    messages,
+    temperature: 0.3,
+    max_tokens: 5_500,
+    stream: false,
+  };
+  if (config.direct) {
+    body.response_format = { type: "json_object" };
+    body.thinking = { type: "disabled" };
+  }
 
-  const response = await fetch(endpoint(), {
+  const response = await fetch(`${config.baseUrl.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${config.apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: process.env.DEEPSEEK_MODEL || DEFAULT_MODEL,
-      messages,
-      response_format: { type: "json_object" },
-      thinking: { type: "disabled" },
-      temperature: 0.3,
-      max_tokens: 5_500,
-      stream: false,
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(TIMEOUT_MS),
     cache: "no-store",
   });
@@ -120,8 +144,11 @@ function parseDraft(content: string, events: SessionEvent[]) {
   return validateReferences(parsed, events);
 }
 
-export async function generateStoryWithDeepSeek(events: SessionEvent[]): Promise<StoryDraft | null> {
-  if (!hasDeepSeekConfig()) return null;
+export async function generateStoryWithDeepSeek(
+  events: SessionEvent[],
+  oidcToken?: string | null,
+): Promise<StoryDraft | null> {
+  if (!modelConfig(oidcToken)) return null;
 
   const compactEvents = events.map((event) => ({
     id: event.id,
@@ -138,7 +165,7 @@ export async function generateStoryWithDeepSeek(events: SessionEvent[]): Promise
     { role: "user", content: userPrompt },
   ];
 
-  let content = await requestJson(messages);
+  let content = await requestJson(messages, oidcToken);
   try {
     return parseDraft(content, events);
   } catch (error) {
@@ -150,7 +177,7 @@ export async function generateStoryWithDeepSeek(events: SessionEvent[]): Promise
         role: "user",
         content: `上一份 JSON 未通过校验：${repairMessage}。请修复并返回完整 JSON，不要解释。`,
       },
-    ]);
+    ], oidcToken);
     return parseDraft(content, events);
   }
 }

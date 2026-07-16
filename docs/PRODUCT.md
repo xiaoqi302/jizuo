@@ -90,7 +90,7 @@ flowchart LR
 
 ### 3.4 模型配置
 
-默认调用 DeepSeek 当前 JSON Mode 能力，配置为 `deepseek-v4-flash`；服务端可通过环境变量替换模型与 Base URL。API Key 始终保留在服务端。
+服务端支持两条 DeepSeek 路径：使用 `DEEPSEEK_API_KEY` 直连 `deepseek-v4-flash`，或在账号启用 AI 额度后，以 Vercel OIDC 身份经 AI Gateway 调用 `deepseek/deepseek-v4-flash`。凭据不会进入浏览器；两条路径都经过严格 Schema 与证据引用校验。
 
 ## 4. 技术落地与可行性
 
@@ -98,7 +98,7 @@ flowchart LR
 
 - 前端：Next.js 16、React 19、TypeScript、响应式 CSS
 - 日志处理：浏览器端 Codex JSONL / 文本解析器
-- AI 层：Next.js Route Handler + DeepSeek Chat Completions JSON Mode
+- AI 层：Next.js Route Handler + DeepSeek Chat Completions JSON Mode（直连 / Vercel AI Gateway）
 - 可靠性：Zod 输入、输出与引用校验，45 秒超时，限频和本地降级
 - 导出：`html-to-image` + JSZip
 - 质量：Vitest、TypeScript、ESLint、Next.js production build，桌面/移动端浏览器验收

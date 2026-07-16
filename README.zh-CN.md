@@ -32,11 +32,13 @@ cp .env.example .env.local
 npm run dev
 ```
 
-在 `.env.local` 填入 DeepSeek Key：
+迹作支持两条服务端路径：使用 DeepSeek Key 直连，或在账号已启用 AI 额度时，通过 Vercel OIDC 与 AI Gateway 调用 DeepSeek V4 Flash。本地直连时，在 `.env.local` 填入：
 
 ```bash
 DEEPSEEK_API_KEY=your_key_here
 ```
+
+本地也可改用 `AI_GATEWAY_API_KEY` 连接 Vercel AI Gateway。
 
 打开 `http://localhost:3000`。没有 Key 也可直接点击“用示例轨迹体验”跑通完整流程。
 
